@@ -1,10 +1,7 @@
 ﻿using System;
-using System.Collections.Generic;
-using System.Linq;
 using System.Net;
 using System.Net.Sockets;
 using System.Text;
-using System.Threading;
 using System.Threading.Tasks;
 
 
@@ -18,24 +15,37 @@ namespace ConsoleClient
             IPAddress ip = IPAddress.Parse("172.16.5.199");
             int port = 5000;
             TcpClient client = new TcpClient();
+
+            Console.WriteLine("Establishing connection...");
             client.Connect(ip, port);
+            Console.WriteLine("Connected to the server..\n");
 
-            
-            Console.WriteLine("Connected to the Chat Room. Type and hit Enter to broadcast your message.\n");
             NetworkStream ns = client.GetStream();
-            Thread thread = new Thread(o => ReceiveData((TcpClient)o));
 
-            thread.Start(client);
+            Console.WriteLine("Enter your name: ");
+            byte[] buffer = Encoding.ASCII.GetBytes(Console.ReadLine());
+            ns.Write(buffer, 0, buffer.Length);
+
+            Console.WriteLine("Connected to the Chat Room. Type and hit Enter to broadcast your message.\n");
+            
+            var clientTask = Task.Factory.StartNew(() => ReceiveData(client));
 
             string s;
-            while (!string.IsNullOrEmpty((s = Console.ReadLine())))
+            while (true)
             {
-                byte[] buffer = Encoding.ASCII.GetBytes(s);
+                s = Console.ReadLine();
+                if (s == "") continue;
+                if (s.ToLower() == "exit") break;
+
+                buffer = Encoding.ASCII.GetBytes(s);
                 ns.Write(buffer, 0, buffer.Length);
             }
 
+            buffer = Encoding.ASCII.GetBytes(s);
+            ns.Write(buffer, 0, buffer.Length);
+
             client.Client.Shutdown(SocketShutdown.Send);
-            thread.Join();
+            clientTask.Wait();
             ns.Close();
             client.Close();
             Console.WriteLine("disconnect from server!!");
